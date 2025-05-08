@@ -1,15 +1,15 @@
 from flask import Flask, render_template, request, session, redirect, url_for
-import os
 import threading
+import os
 import requests
 import time
 from utils.ocr_processing import perform_ocr_and_translate
 from utils.braille_translation import (
     translate_to_braille,
     convert_braille_to_array,
-    convert_braille_to_dots_array
+    convert_braille_to_dots_array,LANGUAGE_TABLE_MAP
 )
-from utils.esp32_communication import send_to_devkit, check_devkit_connection#, request_capture_from_esp32cam
+from utils.esp32_communication import send_to_devkit, check_devkit_connection, request_capture_from_esp32cam
 
 app = Flask(__name__)
 app.secret_key = '9f3b0c57c1d74e2cb8fecd07f512ab90'
@@ -24,6 +24,7 @@ warning_message = ""
 word_index = 0
 words_list = []
 capture_flag = False
+
 
 @app.route('/', endpoint='home')
 def home():
@@ -43,37 +44,118 @@ def language_setting():
 def send_braille_in_background(command):
     threading.Thread(target=send_to_devkit, args=(command,), daemon=True).start()
 
-@app.route('/start')
+import unicodedata
+def clean_text_keep_letters(text):
+    return ''.join(c for c in text if unicodedata.category(c)[0] in ('L', 'N'))
+
+# start --> 와이파이가 될 경우 이거 쓰세요
+@app.route('/start',  methods=['GET', 'POST'])
 def start():
     global recognized_text, warning_message
 
     selected_language = session.get('language', 'english')
-    speed = session.get('speed', '3')
+    speed = session.get('speed', '1')
 
     # ESP32-CAM에 촬영 요청
-    #request_capture_from_esp32cam()
+    # request_capture_from_esp32cam()
 
-    # 최근 이미지 존재 확인
+    #최근 이미지 존재 확인
     if not os.path.exists(RECENT_IMAGE_PATH):
         warning_message = None  # 또는 "" 로 설정해도 됨
         return render_template('start.html', image='recent.jpeg', image_timestamp=int(time.time()), recognized_text="", braille_output=[], braille_dots=[], warning=warning_message)
 
     recognized_text, warning_message = perform_ocr_and_translate(RECENT_IMAGE_PATH, selected_language)
-    braille_string = translate_to_braille(recognized_text, language=selected_language)
-    braille_output = convert_braille_to_array(braille_string)
-    braille_dots = convert_braille_to_dots_array(braille_string)
+    if isinstance(recognized_text, list):
+        word_list = recognized_text
+    else:
+        word_list = recognized_text.split()
+    print(word_list)
 
-    send_braille_in_background(f"speed-{speed}:{braille_output}")
+    cleaned_words = [clean_text_keep_letters(word) for word in word_list if clean_text_keep_letters(word)]
+    print("CL:",cleaned_words)
+    joined_input = '\n'.join(cleaned_words)
+    print(joined_input)
 
+    print("A")
+    joined_braille = translate_to_braille(joined_input, language=selected_language)
+    print("B")
+    braille_per_word = joined_braille.split('\n')
+
+    braille_outputs = []
+    braille_dots_outputs = []
+    braille_strings = []
+
+    for braille_str in braille_per_word:
+        braille_arr = convert_braille_to_array(braille_str)
+        braille_dots = convert_braille_to_dots_array(braille_str)
+
+        braille_strings.append(braille_str)
+        braille_outputs.append(braille_arr)
+        braille_dots_outputs.append(braille_dots)
+
+
+    # print("DOTS:", braille_dots_outputs)
+    print(braille_outputs)
+
+    # def flatten_braille_dots(nested_dots):
+    #     flat_words = []
+    #     for word in nested_dots:
+    #         flat_word = []
+    #         for cell in word:
+    #             for row in cell:
+    #                 flat_word.extend(row)
+    #         flat_words.append(flat_word)
+    #     return flat_words
+    #
+    # flattened_dots = flatten_braille_dots(braille_dots_outputs)
+    # print("Final",flattened_dots)
+    # send_braille_in_background(f"speed-{speed}:{flattened_dots}")
+
+    def flatten_braille_dots_with_words(words, nested_dots):
+        result = []
+        for word, dots in zip(words, nested_dots):
+            flat = []
+            for cell in dots:
+                for row in cell:
+                    flat.extend(row)
+            result.append([word, flat])
+        return result
+
+    flattened_dots = flatten_braille_dots_with_words(cleaned_words, braille_dots_outputs)
+    print("Final (with words)", flattened_dots)
+    send_braille_in_background(f"speed-{speed}:{flattened_dots}")
+    print("___________-____________")
+    print(cleaned_words)
+    print(braille_outputs)
+    print(braille_dots_outputs)
+    print(warning_message)
     return render_template(
         'start.html',
         image='recent.jpeg',
         image_timestamp=int(time.time()),
-        recognized_text=recognized_text,
-        braille_output=braille_output,
-        braille_dots=braille_dots,
+        recognized_text=cleaned_words,
+        word_list=cleaned_words,
+        braille_output=braille_outputs,
+        braille_dots=braille_dots_outputs,
         warning=warning_message
     )
+
+# 오프라인 -- 와이파이가 안될 경우 이거 쓰세요
+# @app.route('/start',  methods=['GET', 'POST'])
+# def start():
+#     cleaned_words = ['Coca', 'Cola', 'ORIGINAL', 'TASTE']
+#     braille_outputs = [[0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 0, 0, 0, 1], [0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1], [0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 0, 1, 1, 1, 1, 0, 1, 1, 1, 0, 0, 1, 0, 0, 1, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 1, 0, 0], [0, 0, 1, 0, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 0, 0, 0, 1, 1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 1, 1, 1, 1, 0, 1, 1, 0, 0, 1, 0, 1]]
+#     braille_dots_outputs = [[[[0, 1], [0, 0], [1, 1]], [[1, 0], [1, 0], [0, 1]], [[1, 1], [1, 0], [1, 1]], [[1, 0], [1, 0], [0, 1]], [[1, 0], [0, 0], [0, 1]]], [[[0, 1], [0, 0], [1, 1]], [[1, 0], [1, 0], [0, 1]], [[1, 1], [1, 0], [1, 1]], [[0, 1], [0, 0], [1, 1]], [[1, 0], [0, 0], [0, 1]]], [[[0, 1], [0, 0], [1, 1]], [[0, 1], [0, 0], [1, 1]], [[1, 1], [1, 0], [1, 1]], [[0, 0], [1, 1], [0, 1]], [[1, 1], [0, 0], [0, 1]], [[1, 0], [1, 0], [1, 1]], [[1, 1], [0, 1], [0, 1]], [[1, 0], [0, 0], [0, 1]], [[0, 1], [0, 0], [1, 1]]], [[[0, 1], [0, 0], [1, 1]], [[0, 1], [0, 0], [1, 1]], [[0, 0], [0, 1], [1, 1]], [[1, 0], [0, 0], [0, 1]], [[1, 1], [1, 0], [1, 1]], [[1, 0], [0, 0], [1, 1]]]]
+#     return render_template(
+#         'start.html',
+#         image='recent.jpeg',
+#         image_timestamp=int(time.time()),
+#         recognized_text=cleaned_words,
+#         word_list=cleaned_words,
+#         braille_output=braille_outputs,
+#         braille_dots=braille_dots_outputs,
+#         warning=warning_message
+#     )
 
 @app.route('/speed_setting')
 def speed_setting():
@@ -89,7 +171,7 @@ def test_speed():
 @app.route('/confirm-speed', methods=['POST'])
 def confirm_speed():
     speed = request.form.get('speed', '3')
-    session['speed'] = speed
+    session['speed'] = 1
     print(f"✅ 설정된 속도 저장됨: {speed}")
     return redirect(url_for('speed_setting'))
 
@@ -113,6 +195,15 @@ def reset_ocr():
 
     selected_language = session.get('language', 'english')
     recognized_text, _ = perform_ocr_and_translate(RECENT_IMAGE_PATH, selected_language)
+    if isinstance(recognized_text, list):
+        if hasattr(recognized_text[0], 'translated_text'):
+            recognized_text = recognized_text[0].translated_text
+        elif hasattr(recognized_text[0], 'description'):
+            recognized_text = recognized_text[0].description.strip()
+        else:
+            recognized_text = str(recognized_text[0])
+    else:
+        recognized_text = str(recognized_text)
     words_list = recognized_text.strip().split()
     word_index = 0
 
@@ -162,5 +253,6 @@ def capture_now():
     else:
         return "WAIT", 204
 '''
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5001, debug=True)
+    app.run(host='0.0.0.0', port=5001, debug=False, threaded=True)

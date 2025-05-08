@@ -1,9 +1,9 @@
 import requests
 
 # ✅ 실제 사용 중인 DevKit IP로 변경하세요
-ESP32_DEVKIT_IP = "192.168.0.136"  # 예시 IP
+ESP32_DEVKIT_IP = "192.168.219.201"  # 예시 IP
 PORT = 8080
-ESP32_CAM_IP = "192.168.0.201"
+ESP32_CAM_IP = "192.168.219.200"
 
 def request_capture_from_esp32cam():
     try:
@@ -14,16 +14,17 @@ def request_capture_from_esp32cam():
         print(f"❌ ESP32-CAM 촬영 요청 실패: {e}")
 
 def send_to_devkit(data):
-    """
-    ESP32 DevKit v1로 점자 및 속도 데이터를 전송하는 함수 (Wi-Fi HTTP POST)
-    예: data = "speed-3:[0,1,1,0,1,0,0,1]"
-    """
+    # import random
+    # binary_string = 'speed-3:[' + ', '.join(str(random.randint(0, 1)) for _ in range(500)) + ']'
+    # data = binary_string
     try:
         url = f"http://{ESP32_DEVKIT_IP}:{PORT}/receive"
-        response = requests.post(url, data=data, timeout=(10,300))
+        headers = {"Content-Type": "text/plain"}
+        response = requests.post(url, data=data, headers=headers, timeout=(10, 300))
         print(f"✅ DevKit 응답: {response.text}")
     except Exception as e:
         print(f"❌ DevKit 전송 실패: {e}")
+
 
 def check_devkit_connection():
     """
