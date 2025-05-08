@@ -1,15 +1,18 @@
 import os
 from google.cloud import vision, translate
+import html
 
 # ✅ 서비스 계정 키 설정
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "brailliant-ocr-f77fc2866f5b.json"
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "abc.json"
 
 # ✅ 언어 이름 → Google 번역 코드 매핑
 LANGUAGE_CODE_MAP = {
     "english": "en",
     "korean": "ko",
     "spanish": "es",
-    "chinese": "zh"
+    "chinese": "zh",
+    "french": "fr",
+    "german": "de"
 }
 
 def perform_ocr_and_translate(image_path, target_language=None):
@@ -22,31 +25,33 @@ def perform_ocr_and_translate(image_path, target_language=None):
     image = vision.Image(content=content)
     response = client.text_detection(image=image)
     texts = response.text_annotations
-    print("🔎 OCR 결과:", texts)
+
 
     if not texts:
         return "", "No text found in image."
 
     detected_text = texts[0].description.strip()
-
-    # ✅ 언어 미선택 시 원문 반환
+    word_list = [text.description for text in texts[1:]]
+    print("🔎 OCR 결과:", word_list)
+    print(len(word_list))
     if not target_language:
-        return detected_text, "No language selected. Using English as default."
+        return word_list, "No language selected. Using English as default."
 
-    # ✅ 언어 코드 변환 (유효성 검사 포함)
     lang_code = LANGUAGE_CODE_MAP.get(target_language.lower())
     if not lang_code:
-        return detected_text, f"Invalid language selected: {target_language}. Using English as default."
-    
-    # ✅ 번역 요청
+        return word_list, f"Invalid language selected: {target_language}. Using English as default."
+
     translate_client = translate.TranslationServiceClient()
-    parent = "projects/brailliant-ocr/locations/global"  # 실제 프로젝트 ID 사용
+    parent = "projects/gptbusiness-453212/locations/global"
 
-    response = translate_client.translate_text(
-        contents=[detected_text],
-        target_language_code=lang_code,
-        parent=parent
-    )
-
-    translated_text = response.translations[0].translated_text
-    return translated_text, None
+    translated_words = []
+    for word in word_list:
+        response = translate_client.translate_text(
+            contents=[word],
+            target_language_code=lang_code,
+            parent=parent
+        )
+        translated_text = response.translations[0].translated_text
+        translated_words.append(html.unescape(translated_text))
+    print("Twords", translated_words)
+    return translated_words, None

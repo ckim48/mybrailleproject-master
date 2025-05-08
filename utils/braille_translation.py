@@ -1,19 +1,23 @@
 import subprocess
 
-# ✅ 언어별 점자 테이블 매핑
+
 LANGUAGE_TABLE_MAP = {
     'english': 'en-us-g2.ctb',
-    'spanish': 'es.ctb',
+    'spanish': 'es-g1.ctb',
     'korean': 'ko-g1.ctb',
-    'chinese': 'zh-cn-g1.ctb'
+    'chinese': 'zh-hans-g1.ctb',
+    'french': 'fr-bfu-g2.ctb',
+    'german': 'de-g1.ctb'
 }
 
-def translate_to_braille(text, language='korean'):
+
+def translate_to_braille(text, language='english'):
+    print('its Called', language)
     """
     주어진 언어에 맞는 점자 테이블로 텍스트를 변환합니다.
     """
     table = LANGUAGE_TABLE_MAP.get(language.lower(), 'ko-g1.ctb')  # 기본값은 한국어
-
+    print('its Called')
     try:
         result = subprocess.run(
             ['lou_translate', table],
@@ -22,6 +26,8 @@ def translate_to_braille(text, language='korean'):
             stderr=subprocess.PIPE,
             check=True
         )
+
+        print("Done")
         return result.stdout.decode().strip()
     except subprocess.CalledProcessError as e:
         print(f"❌ Braille translation error for '{language}' using table '{table}':", e.stderr.decode())
@@ -51,3 +57,7 @@ def convert_braille_to_dots_array(braille_string):
     점자 문자열 전체를 2×3 배열로 변환하여 리스트로 반환
     """
     return [braille_to_dots(char) for char in braille_string]
+
+lst =  ['ot', 'Design', 'me', 'Strategy', 'eck', 'the', 'rules', 'Document', 'it', 'All']
+for i in lst:
+    print(translate_to_braille(i))
