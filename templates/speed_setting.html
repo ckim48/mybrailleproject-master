@@ -101,6 +101,7 @@
     <div class="section decrease" id="increase-btn">+</div>
   </div>
 
+
   <!-- Bottom Bar (clickable) -->
   <div class="bottom-bar" id="home-bar">
     <img src="https://img.icons8.com/ios-filled/50/000000/home.png" alt="Home" class="home-icon">
@@ -117,41 +118,59 @@
         <input type="hidden" name="speed" id="speed-input" value="3">
         <button type="submit" class="btn btn-confirm">Confirm Speed</button>
         </form>
+        <div id="confirm-message" class="text-success fw-semibold mt-3" style="display:none;">
+            Speed <span id="confirmed-speed-value">3</span> confirmed!
+        </div>
     </div>
-    
-    <script>
-        const speedDisplay = document.getElementById('speed-display');
-        const speedInput = document.getElementById('speed-input');
-        const testSpeedInput = document.getElementById('test-speed-input');
-        const increaseBtn = document.getElementById('increase-btn');
-        const decreaseBtn = document.getElementById('decrease-btn');
-    
-        let speed = 3;
-    
-        increaseBtn.addEventListener('click', () => {
-        if (speed < 5) {
-            speed++;
-            updateSpeed();
-        }
-        });
-    
-        decreaseBtn.addEventListener('click', () => {
-        if (speed > 1) {
-            speed--;
-            updateSpeed();
-        }
-        });
-    
-        function updateSpeed() {
-        speedDisplay.textContent = speed;
-        speedInput.value = speed;
-        testSpeedInput.value = speed;
-        }
-    
-        updateSpeed();
-    
-        document.getElementById('home-bar').addEventListener('click', () => {
-        window.location.href = "{{ url_for('home') }}";
-        });
-    </script>
+<script>
+  const speedDisplay = document.getElementById('speed-display');
+  const speedInput = document.getElementById('speed-input');
+  const testSpeedInput = document.getElementById('test-speed-input');
+  const increaseBtn = document.getElementById('increase-btn');
+  const decreaseBtn = document.getElementById('decrease-btn');
+  const confirmMessage = document.getElementById('confirm-message');
+  const confirmedSpeedSpan = document.getElementById('confirmed-speed-value');
+  const confirmForm = document.querySelector('form[action="/confirm-speed"]');
+
+  let speed = {{ speed if speed is not none else 3 }};
+
+  increaseBtn.addEventListener('click', () => {
+    if (speed < 5) {
+      speed++;
+      updateSpeed();
+    }
+  });
+
+  decreaseBtn.addEventListener('click', () => {
+    if (speed > 1) {
+      speed--;
+      updateSpeed();
+    }
+  });
+
+  function updateSpeed() {
+    speedDisplay.textContent = speed;
+    speedInput.value = speed;
+    testSpeedInput.value = speed;
+  }
+
+  updateSpeed();
+
+  confirmForm.addEventListener('submit', function (e) {
+    e.preventDefault();
+    confirmedSpeedSpan.textContent = speed;
+    confirmMessage.style.display = 'block';
+    confirmMessage.style.opacity = '1';
+
+    setTimeout(() => {
+      e.target.submit();
+    }, 800);
+  });
+
+  document.getElementById('home-bar').addEventListener('click', () => {
+    window.location.href = "{{ url_for('home') }}";
+  });
+</script>
+
+
     
