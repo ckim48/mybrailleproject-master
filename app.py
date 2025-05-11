@@ -159,7 +159,8 @@ def start():
 
 @app.route('/speed_setting')
 def speed_setting():
-    return render_template('speed_setting.html')
+    speed = session.get('speed',3)
+    return render_template('speed_setting.html', speed=speed)
 
 @app.route('/test-speed', methods=['POST'])
 def test_speed():
@@ -171,7 +172,7 @@ def test_speed():
 @app.route('/confirm-speed', methods=['POST'])
 def confirm_speed():
     speed = request.form.get('speed', '3')
-    session['speed'] = 1
+    session['speed'] = speed
     print(f"✅ 설정된 속도 저장됨: {speed}")
     return redirect(url_for('speed_setting'))
 
